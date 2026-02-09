@@ -115,27 +115,64 @@ export async function getStaticPaths() {
 }
 
 export async function getStaticProps({ params: { prefix }, locale }) {
-  const props = await resolvePostProps({
-    prefix,
-    locale,
-  })
+  try {
+    const props = await resolvePostProps({
+      prefix,
+      locale,
+    })
 
-  // 如果找不到对应的文章，返回 404 而不是构建失败
-  if (!props?.post) {
-    return {
-      notFound: true,
+    if (!props?.post) {
+      console.warn(`[getStaticProps] 无法找到文章，返回降级页面: /${prefix}`)
+      return {
+        props: {
+          post: {
+            id: `error-${prefix}`,
+            title: '文章暂时无法访问',
+            summary: '该文章可能已被隐藏、删除或正在生成中。',
+            status: 'Published',
+            type: 'Post',
+            slug: prefix,
+            date: { start_date: new Date().toISOString().slice(0, 10) },
+            tags: [],
+            tagItems: []
+          },
+          NOTION_CONFIG: props?.NOTION_CONFIG || {},
+          siteInfo: props?.siteInfo || {},
+        },
+        revalidate: 10
+      }
     }
-  }
 
-  return {
-    props,
-    revalidate: process.env.EXPORT
-      ? undefined
-      : siteConfig(
-        'NEXT_REVALIDATE_SECOND',
-        BLOG.NEXT_REVALIDATE_SECOND,
-        props.NOTION_CONFIG
-      )
+    return {
+      props,
+      revalidate: process.env.EXPORT
+        ? undefined
+        : siteConfig(
+          'NEXT_REVALIDATE_SECOND',
+          BLOG.NEXT_REVALIDATE_SECOND,
+          props.NOTION_CONFIG
+        )
+    }
+  } catch (error) {
+    console.error(`[getStaticProps] 构建页面失败: /${prefix}`, error)
+    return {
+      props: {
+        post: {
+          id: `error-${prefix}`,
+          title: '构建失败',
+          summary: '生成此页面时发生错误，请查看后台日志。',
+          status: 'Published',
+          type: 'Post',
+          slug: prefix,
+          date: { start_date: new Date().toISOString().slice(0, 10) },
+          tags: [],
+          tagItems: []
+        },
+        NOTION_CONFIG: {},
+        siteInfo: {},
+      },
+      revalidate: 10
+    }
   }
 }
 

@@ -44,29 +44,67 @@ export async function getStaticPaths() {
 }
 
 export async function getStaticProps({ params: { prefix, slug }, locale }) {
-  const props = await resolvePostProps({
-    prefix,
-    slug,
-    locale,
-  })
+  try {
+    const props = await resolvePostProps({
+      prefix,
+      slug,
+      locale,
+    })
 
-  // 如果找不到对应的文章，返回 404 而不是构建失败
-  // 这可以处理 Vercel 缓存中存在但 Notion 已删除的幽灵路径
-  if (!props?.post) {
-    return {
-      notFound: true,
+    // 降级处理：如果找不到文章，返回一个错误提示页，而不是 404 (导致构建失败)
+    if (!props?.post) {
+      console.warn(`[getStaticProps] 无法找到文章，返回降级页面: /${prefix}/${slug}`)
+      return {
+        props: {
+          post: {
+            id: `error-${prefix}-${slug}`,
+            title: '文章暂时无法访问',
+            summary: '该文章可能已被隐藏、删除或正在生成中。',
+            status: 'Published',
+            type: 'Post',
+            slug: `${prefix}/${slug}`,
+            date: { start_date: new Date().toISOString().slice(0, 10) },
+            tags: [],
+            tagItems: []
+          },
+          NOTION_CONFIG: props?.NOTION_CONFIG || {},
+          siteInfo: props?.siteInfo || {},
+        },
+        revalidate: 10
+      }
     }
-  }
 
-  return {
-    props,
-    revalidate: process.env.EXPORT
-      ? undefined
-      : siteConfig(
-        'NEXT_REVALIDATE_SECOND',
-        BLOG.NEXT_REVALIDATE_SECOND,
-        props.NOTION_CONFIG
-      ),
+    return {
+      props,
+      revalidate: process.env.EXPORT
+        ? undefined
+        : siteConfig(
+          'NEXT_REVALIDATE_SECOND',
+          BLOG.NEXT_REVALIDATE_SECOND,
+          props.NOTION_CONFIG
+        ),
+    }
+  } catch (error) {
+    console.error(`[getStaticProps] 构建页面失败: /${prefix}/${slug}`, error)
+    // 发生异常时也返回降级页面
+    return {
+      props: {
+        post: {
+          id: `error-${prefix}-${slug}`,
+          title: '构建失败',
+          summary: '生成此页面时发生错误，请查看后台日志。',
+          status: 'Published',
+          type: 'Post',
+          slug: `${prefix}/${slug}`,
+          date: { start_date: new Date().toISOString().slice(0, 10) },
+          tags: [],
+          tagItems: []
+        },
+        NOTION_CONFIG: {},
+        siteInfo: {},
+      },
+      revalidate: 10
+    }
   }
 }
 
