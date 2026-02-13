@@ -4,6 +4,9 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { getQueryParam, getQueryVariable, isBrowser } from '../lib/utils'
 
+// 缓存动态导入的组件，防止重复渲染
+const themeCache = {}
+
 // 在next.config.js中扫描所有主题
 export const { THEMES = [] } = getConfig()?.publicRuntimeConfig || {}
 
@@ -66,10 +69,17 @@ export const getThemeConfig = async themeQuery => {
  * @returns
  */
 export const getBaseLayoutByTheme = theme => {
-  return dynamic(
-    () => import(`@/themes/${theme || BLOG.THEME}`).then(m => m.LayoutBase),
-    { ssr: true }
-  )
+  const themeName = theme || BLOG.THEME
+  const cacheKey = `${themeName}_LayoutBase`
+
+  if (!themeCache[cacheKey]) {
+    themeCache[cacheKey] = dynamic(
+      () => import(`@/themes/${themeName}`).then(m => m.LayoutBase),
+      { ssr: true }
+    )
+  }
+
+  return themeCache[cacheKey]
 }
 
 /**
@@ -91,18 +101,23 @@ export const DynamicLayout = props => {
 export const useLayoutByTheme = ({ layoutName, theme }) => {
   const router = useRouter()
   const themeQuery = getQueryParam(router?.asPath, 'theme') || theme || BLOG.THEME
+  const cacheKey = `dynamic_${themeQuery}_${layoutName}`
 
-  const loadThemeComponents = componentsSource => {
-    const components =
-      componentsSource[layoutName] || componentsSource.LayoutSlug
-    setTimeout(fixThemeDOM, 500)
-    return components
+  if (!themeCache[cacheKey]) {
+    const loadThemeComponents = componentsSource => {
+      const components =
+        componentsSource[layoutName] || componentsSource.LayoutSlug
+      setTimeout(fixThemeDOM, 500)
+      return components
+    }
+
+    themeCache[cacheKey] = dynamic(
+      () => import(`@/themes/${themeQuery}`).then(m => loadThemeComponents(m)),
+      { ssr: true }
+    )
   }
 
-  return dynamic(
-    () => import(`@/themes/${themeQuery}`).then(m => loadThemeComponents(m)),
-    { ssr: true }
-  )
+  return themeCache[cacheKey]
 }
 
 /**
