@@ -2,7 +2,6 @@ import BLOG from '@/blog.config'
 import { siteConfig } from '@/lib/config'
 import { resolvePostProps } from '@/lib/db/SiteDataApi'
 import { DynamicLayout } from '@/themes/theme'
-import PropTypes from 'prop-types'
 
 /**
  * 根据notion的slug访问页面
@@ -11,11 +10,7 @@ import PropTypes from 'prop-types'
  * @returns
  */
 const Dashboard = props => {
-  const theme = siteConfig('THEME', BLOG.THEME, props?.NOTION_CONFIG)
-
-  Dashboard.propTypes = {
-    NOTION_CONFIG: PropTypes.object
-  }
+  const theme = siteConfig('THEME', BLOG.THEME, props.NOTION_CONFIG)
   return <DynamicLayout theme={theme} layoutName='LayoutDashboard' {...props} />
 }
 

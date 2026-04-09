@@ -6,14 +6,12 @@ import { fetchGlobalAllData, resolvePostProps } from '@/lib/db/SiteDataApi'
 import { useGlobal } from '@/lib/global'
 import { getPageTableOfContents } from '@/lib/db/notion/getPageTableOfContents'
 import { getPasswordQuery } from '@/lib/utils/password'
-import { checkSlugHasNoSlash } from '@/lib/utils/post'
+import { checkSlugHasMorThanTwoSlash, checkSlugHasNoSlash, processPostData } from '@/lib/utils/post'
 import { DynamicLayout } from '@/themes/theme'
 import md5 from 'js-md5'
 import { useRouter } from 'next/router'
-import PropTypes from 'prop-types'
+import { idToUuid } from 'notion-utils'
 import { useEffect, useState } from 'react'
-import { isExport } from '@/lib/utils/buildMode'
-import { getPriorityPages, prefetchAllBlockMaps } from '@/lib/build/prefetch'
 
 /**
  * 根据notion的slug访问页面
@@ -97,63 +95,84 @@ const Slug = props => {
   )
 }
 
-Slug.propTypes = {
-  post: PropTypes.shape({
-    id: PropTypes.string,
-    slug: PropTypes.string,
-    password: PropTypes.string,
-    content: PropTypes.array,
-    toc: PropTypes.array,
-    blockMap: PropTypes.shape({
-      block: PropTypes.object
-    })
-  }),
-  NOTION_CONFIG: PropTypes.object
-}
-
 export async function getStaticPaths() {
-  const from = 'slug-paths'
-  const { allPages } = await fetchGlobalAllData({ from })
-
-  // Export 模式：全量预生成
-  if (isExport()) {
-    await prefetchAllBlockMaps(allPages)
+  if (!BLOG.isProd) {
     return {
-      paths: allPages
-        ?.filter(row => checkSlugHasNoSlash(row))
-        .map(row => ({ params: { prefix: row.slug } })),
-      fallback: false
+      paths: [],
+      fallback: true
     }
   }
 
-  // ISR 模式：预生成最新10篇，其余按需渲染
-  const tops = getPriorityPages(allPages)
-  await prefetchAllBlockMaps(tops)
-
+  const from = 'slug-paths'
+  const { allPages } = await fetchGlobalAllData({ from })
+  const paths = allPages
+    ?.filter(row => checkSlugHasNoSlash(row))
+    .map(row => ({ params: { prefix: row.slug } }))
   return {
-    paths: tops
-      .filter(row => checkSlugHasNoSlash(row))
-      .map(row => ({ params: { prefix: row.slug } })),
-    fallback: 'blocking'
+    paths: paths,
+    fallback: true
   }
 }
 
 export async function getStaticProps({ params: { prefix }, locale }) {
-  const props = await resolvePostProps({
-    prefix,
-    locale,
-  })
+  try {
+    const props = await resolvePostProps({
+      prefix,
+      locale,
+    })
 
-  return {
-    props,
-    revalidate: isExport()
-      ? undefined
-      : siteConfig(
-        'NEXT_REVALIDATE_SECOND',
-        BLOG.NEXT_REVALIDATE_SECOND,
-        props.NOTION_CONFIG
-      ),
-    notFound: !props.post
+    if (!props?.post) {
+      console.warn(`[getStaticProps] 无法找到文章，返回降级页面: /${prefix}`)
+      return {
+        props: {
+          post: {
+            id: `error-${prefix}`,
+            title: '文章暂时无法访问',
+            summary: '该文章可能已被隐藏、删除或正在生成中。',
+            status: 'Published',
+            type: 'Post',
+            slug: prefix,
+            date: { start_date: new Date().toISOString().slice(0, 10) },
+            tags: [],
+            tagItems: []
+          },
+          NOTION_CONFIG: props?.NOTION_CONFIG || {},
+          siteInfo: props?.siteInfo || {},
+        },
+        revalidate: 10
+      }
+    }
+
+    return {
+      props,
+      revalidate: process.env.EXPORT
+        ? undefined
+        : siteConfig(
+          'NEXT_REVALIDATE_SECOND',
+          BLOG.NEXT_REVALIDATE_SECOND,
+          props.NOTION_CONFIG
+        )
+    }
+  } catch (error) {
+    console.error(`[getStaticProps] 构建页面失败: /${prefix}`, error)
+    return {
+      props: {
+        post: {
+          id: `error-${prefix}`,
+          title: '构建失败',
+          summary: '生成此页面时发生错误，请查看后台日志。',
+          status: 'Published',
+          type: 'Post',
+          slug: prefix,
+          date: { start_date: new Date().toISOString().slice(0, 10) },
+          tags: [],
+          tagItems: []
+        },
+        NOTION_CONFIG: {},
+        siteInfo: {},
+      },
+      revalidate: 10
+    }
   }
 }
 

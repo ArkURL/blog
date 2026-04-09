@@ -3,8 +3,6 @@ import { siteConfig } from '@/lib/config'
 import { fetchGlobalAllData, resolvePostProps } from '@/lib/db/SiteDataApi'
 import Slug from '..'
 import { checkSlugHasOneSlash } from '@/lib/utils/post'
-import { isExport } from '@/lib/utils/buildMode'
-import { getPriorityPages, prefetchAllBlockMaps } from '@/lib/build/prefetch'
 
 /**
  * 根据notion的slug访问页面
@@ -17,40 +15,31 @@ const PrefixSlug = props => {
 }
 
 export async function getStaticPaths() {
-  const from = 'slug-paths'
-  const { allPages } = await fetchGlobalAllData({ from })
-
-  // Export 模式：全量预生成
-  if (isExport()) {
-    await prefetchAllBlockMaps(allPages)
+  if (!BLOG.isProd) {
     return {
-      paths: allPages
-        ?.filter(row => checkSlugHasOneSlash(row))
-        .map(row => ({
-          params: {
-            prefix: row.slug.split('/')[0],
-            slug: row.slug.split('/')[1]
-          }
-        })),
-      fallback: false
+      paths: [],
+      fallback: true
     }
   }
 
-  // ISR 模式：预生成最新10篇（仅两段路径格式）
-  const tops = getPriorityPages(allPages)
+  const from = 'slug-paths'
+  const { allPages } = await fetchGlobalAllData({ from })
 
-  await prefetchAllBlockMaps(tops)
+  // 根据slug中的 / 分割成prefix和slug两个字段 ; 例如 article/test
+  // 最终用户可以通过  [domain]/[prefix]/[slug] 路径访问，即这里的 [domain]/article/test
+  const paths = allPages
+    ?.filter(row => checkSlugHasOneSlash(row))
+    .map(row => ({
+      params: { prefix: row.slug.split('/')[0], slug: row.slug.split('/')[1] }
+    }))
+
+  // 增加一种访问路径 允许通过 [category]/[slug] 访问文章
+  // 例如文章slug 是 test ，然后文章的分类category是 production
+  // 则除了 [domain]/[slug] 以外，还支持分类名访问: [domain]/[category]/[slug]
 
   return {
-    paths: tops
-      .filter(p => checkSlugHasOneSlash(p))
-      .map(row => ({
-        params: {
-          prefix: row.slug.split('/')[0],
-          slug: row.slug.split('/')[1]
-        }
-      })),
-    fallback: 'blocking'
+    paths: paths,
+    fallback: true
   }
 }
 
@@ -85,15 +74,37 @@ export async function getStaticProps({ params: { prefix, slug }, locale }) {
       }
     }
 
-  return {
-    props,
-    revalidate: process.env.EXPORT
-      ? undefined
-      : siteConfig(
-        'NEXT_REVALIDATE_SECOND',
-        BLOG.NEXT_REVALIDATE_SECOND,
-        props.NOTION_CONFIG
-      ),
+    return {
+      props,
+      revalidate: process.env.EXPORT
+        ? undefined
+        : siteConfig(
+          'NEXT_REVALIDATE_SECOND',
+          BLOG.NEXT_REVALIDATE_SECOND,
+          props.NOTION_CONFIG
+        ),
+    }
+  } catch (error) {
+    console.error(`[getStaticProps] 构建页面失败: /${prefix}/${slug}`, error)
+    // 发生异常时也返回降级页面
+    return {
+      props: {
+        post: {
+          id: `error-${prefix}-${slug}`,
+          title: '构建失败',
+          summary: '生成此页面时发生错误，请查看后台日志。',
+          status: 'Published',
+          type: 'Post',
+          slug: `${prefix}/${slug}`,
+          date: { start_date: new Date().toISOString().slice(0, 10) },
+          tags: [],
+          tagItems: []
+        },
+        NOTION_CONFIG: {},
+        siteInfo: {},
+      },
+      revalidate: 10
+    }
   }
 }
 
