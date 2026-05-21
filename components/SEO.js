@@ -40,6 +40,23 @@ const SEO = props => {
     })
   }, [])
 
+  // 根据暗色模式切换 favicon
+  useEffect(() => {
+    const updateFavicon = () => {
+      const isDark = document.documentElement.classList.contains('dark')
+      const links = document.querySelectorAll('link[rel="icon"]')
+      links.forEach(link => {
+        link.href = isDark ? (faviconDark || '/favicon-dark.png') : (favicon || '/favicon-light.png')
+      })
+    }
+
+    updateFavicon()
+
+    const observer = new MutationObserver(updateFavicon)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [favicon, faviconDark])
+
   // SEO关键词
   const KEYWORDS = siteConfig('KEYWORDS')
   let keywords = meta?.tags || KEYWORDS
@@ -57,6 +74,7 @@ const SEO = props => {
   const lang = siteConfig('LANG').replace('-', '_') // Facebook OpenGraph 要 zh_CN 這樣的格式才抓得到語言
   const category = meta?.category || KEYWORDS // section 主要是像是 category 這樣的分類，Facebook 用這個來抓連結的分類
   const favicon = siteConfig('BLOG_FAVICON')
+  const faviconDark = siteConfig('BLOG_FAVICON_DARK')
   const BACKGROUND_DARK = siteConfig('BACKGROUND_DARK', '', NOTION_CONFIG)
 
   const SEO_BAIDU_SITE_VERIFICATION = siteConfig(
@@ -70,8 +88,6 @@ const SEO = props => {
     null,
     NOTION_CONFIG
   )
-
-  const BLOG_FAVICON = siteConfig('BLOG_FAVICON', null, NOTION_CONFIG)
 
   const COMMENT_WEBMENTION_ENABLE = siteConfig(
     'COMMENT_WEBMENTION_ENABLE',
@@ -159,8 +175,6 @@ const SEO = props => {
       <meta name='twitter:description' content={description} />
       <meta name='twitter:image' content={image} />
       <meta name='twitter:image:alt' content={title} />
-
-      <link rel='icon' href={BLOG_FAVICON} />
 
       {COMMENT_WEBMENTION_ENABLE && (
         <>
