@@ -42,13 +42,21 @@ const SEO = props => {
     })
   }, [])
 
-  // 根据暗色模式切换 favicon
+  // 根据暗色模式切换所有 favicon 资源
   useEffect(() => {
     const updateFavicon = () => {
       const isDark = document.documentElement.classList.contains('dark')
-      const links = document.querySelectorAll('link[rel="icon"]')
-      links.forEach(link => {
-        link.href = isDark ? (faviconDark || '/favicon-dark.png') : (favicon || '/favicon-light.png')
+      const theme = isDark ? 'dark' : 'light'
+      const selectors = [
+        'link[rel="icon"]',
+        'link[rel="apple-touch-icon"]',
+        'link[rel="manifest"]'
+      ]
+      document.querySelectorAll(selectors.join(',')).forEach(link => {
+        const href = link.getAttribute('href')
+        if (href && href.includes('/favicon/')) {
+          link.setAttribute('href', href.replace(/\/(dark|light)\//, `/${theme}/`))
+        }
       })
     }
 
@@ -117,6 +125,10 @@ const SEO = props => {
   return (
     <Head>
       <link rel='icon' href={favicon} />
+      <link rel='icon' type='image/png' sizes='32x32' href='/favicon/light/favicon-32x32.png' />
+      <link rel='icon' type='image/png' sizes='16x16' href='/favicon/light/favicon-16x16.png' />
+      <link rel='apple-touch-icon' sizes='180x180' href='/favicon/light/apple-touch-icon.png' />
+      <link rel='manifest' href='/favicon/light/site.webmanifest' />
       <title>{title}</title>
       <meta name='theme-color' content={BACKGROUND_DARK} />
       <meta

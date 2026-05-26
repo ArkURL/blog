@@ -21,8 +21,8 @@ const BLOG = {
   BIO: process.env.NEXT_PUBLIC_BIO || '一个想跑路的打灰人，随缘更新', // 作者简介
   LINK: process.env.NEXT_PUBLIC_LINK || 'https://blog.20263602.xyz', // 网站地址
   KEYWORDS: process.env.NEXT_PUBLIC_KEYWORD || 'SailingRoot, 博客, 技术, 分享', // 网站关键词 英文逗号隔开
-  BLOG_FAVICON: process.env.NEXT_PUBLIC_FAVICON || '/favicon-light.png', // blog favicon 配置, 默认使用 /public/favicon-light.png，支持在线图片
-  BLOG_FAVICON_DARK: process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon-dark.png', // 深色模式 favicon
+  BLOG_FAVICON: process.env.NEXT_PUBLIC_FAVICON || '/favicon/light/favicon-32x32.png', // blog favicon 配置, 默认使用 /public/favicon/light/ 目录下的图标，支持在线图片
+  BLOG_FAVICON_DARK: process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon/dark/favicon-32x32.png', // 深色模式 favicon
   BEI_AN: process.env.NEXT_PUBLIC_BEI_AN || '非官方备案·萌ICP备20263602号', // 备案号 闽ICP备XXXXXX
   BEI_AN_LINK: process.env.NEXT_PUBLIC_BEI_AN_LINK || 'https://icp.gov.moe/?keyword=20263602', // 备案查询链接，如果用了萌备等备案请在这里填写
   BEI_AN_GONGAN: process.env.NEXT_PUBLIC_BEI_AN_GONGAN || '', // 公安备案号，例如 '浙公网安备3xxxxxxxx8号'
